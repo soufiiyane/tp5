@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "29217661806",
+    "project_id": "atelier4-p-kasside-iir5gx",
+    "storage_bucket": "atelier4-p-kasside-iir5gx.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:29217661806:android:5f1bcf2aa76c823281d77f",
+        "android_client_info": {
+          "package_name": "com.a4KASS"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSL2mC8_AFEuNvq1cEfnV0jE7hqQ6GYAU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:29217661806:android:23f0cdca8043c2da81d77f",
+        "android_client_info": {
+          "package_name": "com.example"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSL2mC8_AFEuNvq1cEfnV0jE7hqQ6GYAU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
