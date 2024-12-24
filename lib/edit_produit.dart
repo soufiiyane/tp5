@@ -1,17 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'produit.dart';
-import 'package:universal_html/html.dart' as html;
+import 'package:http/http.dart' as http;
 
 class EditProduitForm extends StatefulWidget {
-  final Produit produit;
-  final Function(Produit) onSave;
+  final Map<String, dynamic> produit;
 
-  const EditProduitForm({
-    super.key,
-    required this.produit,
-    required this.onSave,
-  });
+  const EditProduitForm({Key? key, required this.produit}) : super(key: key);
 
   @override
   State<EditProduitForm> createState() => _EditProduitFormState();
@@ -19,18 +14,27 @@ class EditProduitForm extends StatefulWidget {
 
 class _EditProduitFormState extends State<EditProduitForm> {
   final _formKey = GlobalKey<FormState>();
-  late String? _imageDataUrl;
   late TextEditingController _libelleController;
   late TextEditingController _descriptionController;
   late TextEditingController _prixController;
+  String? _photoUrl;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _imageDataUrl = widget.produit.photoUrl;
-    _libelleController = TextEditingController(text: widget.produit.libelle);
-    _descriptionController = TextEditingController(text: widget.produit.description);
-    _prixController = TextEditingController(text: widget.produit.prix.toString());
+    _libelleController = TextEditingController(text: widget.produit['libelle']);
+    _descriptionController = TextEditingController(text: widget.produit['description']);
+    _prixController = TextEditingController(text: widget.produit['prix'].toString());
+    _photoUrl = widget.produit['photoUrl'];
+  }
+
+  @override
+  void dispose() {
+    _libelleController.dispose();
+    _descriptionController.dispose();
+    _prixController.dispose();
+    super.dispose();
   }
 
   Future<void> pickImage() async {
@@ -39,11 +43,52 @@ class _EditProduitFormState extends State<EditProduitForm> {
     
     if (image != null) {
       final bytes = await image.readAsBytes();
-      final base64Image = html.window.btoa(String.fromCharCodes(bytes));
+      final base64Image = base64Encode(bytes);
       final dataUrl = 'data:image/jpeg;base64,$base64Image';
       
       setState(() {
-        _imageDataUrl = dataUrl;
+        _photoUrl = dataUrl;
+      });
+    }
+  }
+
+  Future<void> updateProduct() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final url = Uri.parse('https://iouxy8p964.execute-api.us-east-1.amazonaws.com/dev/product');
+    final headers = {'Content-Type': 'application/json'};
+    final body = {
+      "body": {
+        "productId": widget.produit['id'],
+        "libelle": _libelleController.text,
+        "description": _descriptionController.text,
+        "prix": double.parse(_prixController.text),
+        "photoUrl": _photoUrl
+      }
+    };
+
+    try {
+      final response = await http.patch(url, headers: headers, body: jsonEncode(body));
+      
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Produit modifié avec succès'))
+        );
+        Navigator.pop(context, true); // Return true to indicate successful update
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${response.body}'))
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur réseau: $e'))
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -82,37 +127,32 @@ class _EditProduitFormState extends State<EditProduitForm> {
               onPressed: pickImage,
               child: const Text('Modifier l\'image'),
             ),
-            if (_imageDataUrl != null) ...[
+            if (_photoUrl != null) ...[
               const SizedBox(height: 10),
-              Image.network(_imageDataUrl!, height: 200),
+              Image.network(
+                _photoUrl!,
+                height: 200,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(child: Text('Error loading image'));
+                },
+              ),
             ],
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {
-                if (_formKey.currentState?.validate() ?? false) {
-                  final updatedProduit = Produit(
-                    libelle: _libelleController.text,
-                    description: _descriptionController.text,
-                    prix: double.parse(_prixController.text),
-                    photoUrl: _imageDataUrl ?? '',
-                  );
-                  widget.onSave(updatedProduit);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Enregistrer les modifications'),
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      if (_formKey.currentState?.validate() ?? false) {
+                        updateProduct();
+                      }
+                    },
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Enregistrer les modifications'),
             ),
           ],
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _libelleController.dispose();
-    _descriptionController.dispose();
-    _prixController.dispose();
-    super.dispose();
   }
 }

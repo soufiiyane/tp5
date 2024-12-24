@@ -1,12 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'produit.dart';
-import 'package:universal_html/html.dart' as html;
+import 'package:http/http.dart' as http;
 
 class AddProduitForm extends StatefulWidget {
-  final Function(Produit) onSave;
-
-  const AddProduitForm({super.key, required this.onSave});
+  const AddProduitForm({super.key});
 
   @override
   State<AddProduitForm> createState() => _AddProduitFormState();
@@ -14,8 +12,9 @@ class AddProduitForm extends StatefulWidget {
 
 class _AddProduitFormState extends State<AddProduitForm> {
   final _formKey = GlobalKey<FormState>();
-  final _produit = Produit();
-  String? _imageDataUrl;
+  String? _libelle, _description, _photoUrl;
+  double? _prix;
+  bool _isLoading = false;
 
   Future<void> pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -23,12 +22,51 @@ class _AddProduitFormState extends State<AddProduitForm> {
     
     if (image != null) {
       final bytes = await image.readAsBytes();
-      final base64Image = html.window.btoa(String.fromCharCodes(bytes));
+      final base64Image = base64Encode(bytes);
       final dataUrl = 'data:image/jpeg;base64,$base64Image';
       
       setState(() {
-        _imageDataUrl = dataUrl;
-        _produit.photoUrl = dataUrl;
+        _photoUrl = dataUrl;
+      });
+    }
+  }
+
+  Future<void> submitProduct() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final url = Uri.parse('https://iouxy8p964.execute-api.us-east-1.amazonaws.com/dev/product');
+    final headers = {'Content-Type': 'application/json'};
+    final body = {
+      "body": {
+        "libelle": _libelle,
+        "description": _description,
+        "prix": _prix,
+        "photoUrl": _photoUrl
+      }
+    };
+
+    try {
+      final response = await http.post(url, headers: headers, body: jsonEncode(body));
+      
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Produit ajouté avec succès'))
+        );
+        Navigator.pop(context); // Go back to the list after successful submission
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${response.body}'))
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur réseau: $e'))
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -45,12 +83,12 @@ class _AddProduitFormState extends State<AddProduitForm> {
             TextFormField(
               decoration: const InputDecoration(labelText: 'Libellé'),
               validator: (value) => value?.isEmpty ?? true ? 'Champ requis' : null,
-              onSaved: (value) => _produit.libelle = value ?? '',
+              onSaved: (value) => _libelle = value,
             ),
             TextFormField(
               decoration: const InputDecoration(labelText: 'Description'),
               validator: (value) => value?.isEmpty ?? true ? 'Champ requis' : null,
-              onSaved: (value) => _produit.description = value ?? '',
+              onSaved: (value) => _description = value,
             ),
             TextFormField(
               decoration: const InputDecoration(labelText: 'Prix'),
@@ -60,27 +98,30 @@ class _AddProduitFormState extends State<AddProduitForm> {
                 if (double.tryParse(value!) == null) return 'Prix invalide';
                 return null;
               },
-              onSaved: (value) => _produit.prix = double.parse(value ?? '0'),
+              onSaved: (value) => _prix = double.parse(value ?? '0'),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: pickImage,
               child: const Text('Sélectionner une image'),
             ),
-            if (_imageDataUrl != null) ...[
+            if (_photoUrl != null) ...[
               const SizedBox(height: 10),
-              Image.network(_imageDataUrl!, height: 200),
+              Image.network(_photoUrl!, height: 200),
             ],
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {
-                if (_formKey.currentState?.validate() ?? false) {
-                  _formKey.currentState?.save();
-                  widget.onSave(_produit);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Enregistrer'),
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      if (_formKey.currentState?.validate() ?? false) {
+                        _formKey.currentState?.save();
+                        submitProduct();
+                      }
+                    },
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Enregistrer'),
             ),
           ],
         ),
